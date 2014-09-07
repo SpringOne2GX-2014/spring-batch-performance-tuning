@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<beans xmlns="http://www.springframework.org/schema/beans"
+	   xmlns:batch="http://www.springframework.org/schema/batch"
+	   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	   xsi:schemaLocation="http://www.springframework.org/schema/beans
+		 http://www.springframework.org/schema/beans/spring-beans.xsd
+		 http://www.springframework.org/schema/batch
+		 http://www.springframework.org/schema/batch/spring-batch.xsd">
+
+	<batch:job id="imageProcessingJob">
+		<batch:listeners>
+			<batch:listener ref="jobListener"/>
+		</batch:listeners>
+		<batch:step id="cleanup" next="processImages.master">
+			<batch:tasklet ref="cleanupTasklet"/>
+		</batch:step>
+		<batch:step id="processImages.master">
+			<batch:partition partitioner="partitioner" handler="partitionHandler"/>
+		</batch:step>
+	</batch:job>
+
+	<batch:step id="processImages">
+		<batch:tasklet>
+			<bean class="io.spring.remotepartitioningmaster.tasklet.NoopTasklet"/>
+		</batch:tasklet>
+	</batch:step>
+
+	<batch:job-repository/>
+
+	<bean id="cleanupTasklet" class="io.spring.remotepartitioningmaster.tasklet.CleanupTasklet">
+		<constructor-arg value="${processed.images.dir}"/>
+	</bean>
+
+	<bean id="jobListener" class="io.spring.remotepartitioningmaster.listener.JobDurationListener"/>
+
+	<bean id="jobLauncher" class="org.springframework.batch.core.launch.support.SimpleJobLauncher">
+		<property name="jobRepository" ref="jobRepository"/>
+	</bean>
+
+	<bean id="partitioner" class="io.spring.remotepartitioningmaster.partition.ColumnRangePartitioner">
+		<constructor-arg index="0" ref="dataSource"/>
+		<constructor-arg index="1" value="image_submissions"/>
+		<constructor-arg index="2" value="id"/>
+	</bean>
+
+	<bean id="partitionHandler" class="org.springframework.batch.integration.partition.MessageChannelPartitionHandler">
+		<property name="stepName" value="processImages"/>
+		<property name="gridSize" value="5"/>
+		<property name="replyChannel" ref="aggregatedReplyChannel"/>
+		<property name="messagingOperations">
+			<bean class="org.springframework.integration.core.MessagingTemplate">
+				<property name="defaultChannel" ref="requestsChannel"/>
+			</bean>
+		</property>
+	</bean>
+</beans>

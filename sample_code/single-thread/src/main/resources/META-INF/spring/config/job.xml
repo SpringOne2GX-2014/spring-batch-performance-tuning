@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<beans xmlns="http://www.springframework.org/schema/beans"
+	   xmlns:batch="http://www.springframework.org/schema/batch"
+	   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	   xsi:schemaLocation="http://www.springframework.org/schema/beans
+		 http://www.springframework.org/schema/beans/spring-beans.xsd
+		 http://www.springframework.org/schema/batch
+		 http://www.springframework.org/schema/batch/spring-batch.xsd">
+
+	<batch:job id="imageProcessingJob">
+		<batch:listeners>
+			<batch:listener ref="jobListener"/>
+		</batch:listeners>
+		<batch:step id="cleanup" next="processImages">
+			<batch:tasklet ref="cleanupTasklet"/>
+		</batch:step>
+		<batch:step id="processImages">
+			<batch:tasklet>
+				<batch:chunk reader="itemReader" processor="itemProcessor" writer="itemWriter" commit-interval="500"/>
+			</batch:tasklet>
+		</batch:step>
+	</batch:job>
+
+	<batch:job-repository/>
+
+	<bean id="cleanupTasklet" class="io.spring.singlethread.tasklet.CleanupTasklet">
+		<constructor-arg value="${processed.images.dir}"/>
+	</bean>
+
+	<bean id="itemReader" class="org.springframework.batch.item.database.JdbcPagingItemReader">
+		<property name="dataSource" ref="dataSource"/>
+		<property name="queryProvider">
+			<bean class="org.springframework.batch.item.database.support.SqlPagingQueryProviderFactoryBean">
+				<property name="dataSource" ref="dataSource"/>
+				<property name="selectClause" value="SELECT id, file_name"/>
+				<property name="fromClause" value="from image_submissions"/>
+				<property name="sortKey" value="id"/>
+			</bean>
+		</property>
+		<property name="pageSize" value="500"/>
+		<property name="rowMapper">
+			<bean class="org.springframework.jdbc.core.BeanPropertyRowMapper">
+				<constructor-arg value="io.spring.singlethread.domain.ImageSubmission"/>
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="itemProcessor" class="io.spring.singlethread.processor.ImageProcessor">
+		<constructor-arg index="0" value="${unprocessed.images.dir}"/>
+		<constructor-arg index="1" value="200"/>
+		<constructor-arg index="2" value="150"/>
+	</bean>
+
+	<bean id="itemWriter" class="io.spring.singlethread.writer.ImageWriter">
+		<constructor-arg index="0" value="${processed.images.dir}"/>
+		<constructor-arg index="1" value="jpg"/>
+	</bean>
+
+	<bean id="jobListener" class="io.spring.singlethread.listener.JobDurationListener"/>
+
+	<bean id="jobLauncher" class="org.springframework.batch.core.launch.support.SimpleJobLauncher">
+		<property name="jobRepository" ref="jobRepository"/>
+	</bean>
+</beans>

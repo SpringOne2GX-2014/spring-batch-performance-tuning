@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<beans xmlns="http://www.springframework.org/schema/beans"
+	   xmlns:batch="http://www.springframework.org/schema/batch"
+	   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	   xsi:schemaLocation="http://www.springframework.org/schema/beans
+		 http://www.springframework.org/schema/beans/spring-beans.xsd
+		 http://www.springframework.org/schema/batch
+		 http://www.springframework.org/schema/batch/spring-batch.xsd">
+
+	<batch:step id="processImages">
+		<batch:tasklet>
+			<batch:chunk reader="itemReader" processor="itemProcessor" writer="itemWriter" commit-interval="500"/>
+		</batch:tasklet>
+	</batch:step>
+
+	<batch:job-repository/>
+
+	<bean id="itemReader" class="org.springframework.batch.item.database.JdbcPagingItemReader" scope="step">
+		<property name="dataSource" ref="dataSource"/>
+		<property name="queryProvider">
+			<bean class="org.springframework.batch.item.database.support.SqlPagingQueryProviderFactoryBean">
+				<property name="dataSource" ref="dataSource"/>
+				<property name="selectClause" value="SELECT id, file_name"/>
+				<property name="fromClause" value="from image_submissions"/>
+				<property name="whereClause">
+					<value>
+						<![CDATA[
+							where id >= :minValue and id <= :maxValue
+						]]>
+					</value>
+				</property>
+				<property name="sortKey" value="id"/>
+			</bean>
+		</property>
+		<property name="pageSize" value="500"/>
+		<property name="rowMapper">
+			<bean class="org.springframework.jdbc.core.BeanPropertyRowMapper">
+				<constructor-arg value="io.spring.remotepartitioningslave.domain.ImageSubmission"/>
+			</bean>
+		</property>
+		<property name="parameterValues">
+			<map>
+				<entry key="minValue" value="#{stepExecutionContext[minValue]}"/>
+				<entry key="maxValue" value="#{stepExecutionContext[maxValue]}"/>
+			</map>
+		</property>
+	</bean>
+
+	<bean id="itemProcessor" class="io.spring.remotepartitioningslave.processor.ImageProcessor">
+		<constructor-arg index="0" value="${unprocessed.images.dir}"/>
+		<constructor-arg index="1" value="200"/>
+		<constructor-arg index="2" value="150"/>
+	</bean>
+
+	<bean id="itemWriter" class="io.spring.remotepartitioningslave.writer.ImageWriter" scope="step">
+		<constructor-arg index="0" value="${processed.images.dir}"/>
+		<constructor-arg index="1" value="jpg"/>
+	</bean>
+
+	<bean id="jobLauncher" class="org.springframework.batch.core.launch.support.SimpleJobLauncher">
+		<property name="jobRepository" ref="jobRepository"/>
+	</bean>
+
+	<bean id="stepExecutionRequestHandler"
+		  class="org.springframework.batch.integration.partition.StepExecutionRequestHandler">
+		<property name="jobExplorer" ref="jobExplorer"/>
+		<property name="stepLocator" ref="stepLocator"/>
+	</bean>
+
+	<bean id="jobExplorer" class="org.springframework.batch.core.explore.support.JobExplorerFactoryBean">
+		<property name="dataSource" ref="dataSource"/>
+	</bean>
+
+	<bean id="stepLocator" class="org.springframework.batch.integration.partition.BeanFactoryStepLocator"/>
+</beans>

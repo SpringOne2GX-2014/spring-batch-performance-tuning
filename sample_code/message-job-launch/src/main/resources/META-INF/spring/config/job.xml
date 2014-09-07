@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<beans xmlns="http://www.springframework.org/schema/beans"
+	   xmlns:batch="http://www.springframework.org/schema/batch"
+	   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	   xsi:schemaLocation="http://www.springframework.org/schema/beans
+		 http://www.springframework.org/schema/beans/spring-beans.xsd
+		 http://www.springframework.org/schema/batch
+		 http://www.springframework.org/schema/batch/spring-batch.xsd ">
+
+	<batch:job id="imageProcessingJob">
+		<batch:listeners>
+			<batch:listener ref="jobListener"/>
+		</batch:listeners>
+		<batch:step id="cleanup" next="uncompressImages">
+			<batch:tasklet ref="cleanupTasklet"/>
+		</batch:step>
+		<batch:step id="uncompressImages" next="processImages">
+			<batch:tasklet ref="unzipTasklet"/>
+		</batch:step>
+		<batch:step id="processImages">
+			<batch:tasklet task-executor="taskExecutor">
+				<batch:chunk reader="itemReader" processor="itemProcessor" writer="itemWriter" commit-interval="500"/>
+			</batch:tasklet>
+		</batch:step>
+	</batch:job>
+
+	<batch:job-repository/>
+
+	<bean id="cleanupTasklet" class="io.spring.messagejoblaunch.tasklet.CleanupTasklet">
+		<constructor-arg value="${processed.images.dir},${unprocessed.images.dir}"/>
+	</bean>
+
+	<bean id="unzipTasklet" class="io.spring.messagejoblaunch.tasklet.UnzipTasklet" scope="step">
+		<constructor-arg index="0" value="#{jobParameters['input.file.name']}"/>
+		<constructor-arg index="1" value="${unprocessed.images.dir}"/>
+	</bean>
+
+	<bean id="taskExecutor" class="org.springframework.core.task.SimpleAsyncTaskExecutor">
+		<property name="concurrencyLimit" value="8"/>
+	</bean>
+
+	<bean id="itemReader" class="io.spring.messagejoblaunch.reader.DirectoryItemReader" scope="step">
+		<constructor-arg index="0" value="${unprocessed.images.dir}"/>
+		<constructor-arg index="1" value=".jpg"/>
+	</bean>
+
+	<bean id="itemProcessor" class="io.spring.messagejoblaunch.processor.ImageProcessor">
+		<constructor-arg index="0" value="${unprocessed.images.dir}"/>
+		<constructor-arg index="1" value="200"/>
+		<constructor-arg index="2" value="150"/>
+	</bean>
+
+	<bean id="itemWriter" class="io.spring.messagejoblaunch.writer.ImageWriter">
+		<constructor-arg index="0" value="${processed.images.dir}"/>
+		<constructor-arg index="1" value="jpg"/>
+	</bean>
+
+	<bean id="jobListener" class="io.spring.messagejoblaunch.listener.JobDurationListener">
+		<constructor-arg index="0" ref="notificationSender"/>
+	</bean>
+
+	<bean id="jobLauncher" class="org.springframework.batch.core.launch.support.SimpleJobLauncher">
+		<property name="jobRepository" ref="jobRepository"/>
+	</bean>
+</beans>
