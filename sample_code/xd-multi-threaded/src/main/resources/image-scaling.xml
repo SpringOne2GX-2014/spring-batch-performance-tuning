@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:batch="http://www.springframework.org/schema/batch"
+	xmlns:jdbc="http://www.springframework.org/schema/jdbc"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans
+		http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/jdbc
+		http://www.springframework.org/schema/jdbc/spring-jdbc.xsd
+		http://www.springframework.org/schema/context
+		http://www.springframework.org/schema/context/spring-context.xsd
+		http://www.springframework.org/schema/batch
+		http://www.springframework.org/schema/batch/spring-batch.xsd">
+
+	<context:property-placeholder location="classpath:/application.properties"/>
+
+	<jdbc:initialize-database>
+		<jdbc:script location="${data.script}"/>
+	</jdbc:initialize-database>
+
+	<batch:job id="job">
+		<batch:listeners>
+			<batch:listener ref="jobListener"/>
+		</batch:listeners>
+		<batch:step id="cleanup" next="processImages">
+			<batch:tasklet ref="cleanupTasklet"/>
+		</batch:step>
+		<batch:step id="processImages">
+			<batch:tasklet task-executor="taskExecutor">
+				<batch:chunk reader="itemReader" processor="itemProcessor" writer="itemWriter" commit-interval="100"/>
+			</batch:tasklet>
+		</batch:step>
+	</batch:job>
+
+	<bean id="cleanupTasklet" class="io.spring.multithreaded.tasklet.CleanupTasklet">
+		<constructor-arg value="${processed.images.dir}"/>
+	</bean>
+
+	<bean id="taskExecutor" class="org.springframework.core.task.SimpleAsyncTaskExecutor"/>
+
+	<bean id="itemReader" class="org.springframework.batch.item.database.JdbcPagingItemReader">
+		<property name="dataSource" ref="dataSource"/>
+		<property name="queryProvider">
+			<bean class="org.springframework.batch.item.database.support.SqlPagingQueryProviderFactoryBean">
+				<property name="dataSource" ref="dataSource"/>
+				<property name="selectClause" value="SELECT id, file_name"/>
+				<property name="fromClause" value="from image_submissions"/>
+				<property name="sortKey" value="id"/>
+			</bean>
+		</property>
+		<property name="pageSize" value="100"/>
+		<property name="rowMapper">
+			<bean class="org.springframework.jdbc.core.BeanPropertyRowMapper">
+				<constructor-arg value="io.spring.multithreaded.domain.ImageSubmission"/>
+			</bean>
+		</property>
+	</bean>
+
+	<bean id="itemProcessor" class="io.spring.multithreaded.processor.ImageProcessor">
+		<constructor-arg index="0" value="${unprocessed.images.dir}"/>
+		<constructor-arg index="1" value="200"/>
+		<constructor-arg index="2" value="150"/>
+	</bean>
+
+	<bean id="itemWriter" class="io.spring.multithreaded.writer.ImageWriter">
+		<constructor-arg index="0" value="${processed.images.dir}"/>
+		<constructor-arg index="1" value="jpg"/>
+	</bean>
+
+	<bean id="jobListener" class="io.spring.multithreaded.listener.JobDurationListener"/>
+
+</beans>

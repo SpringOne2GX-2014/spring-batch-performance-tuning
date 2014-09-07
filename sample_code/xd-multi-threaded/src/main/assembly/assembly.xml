@@ -1,0 +1,36 @@
+<assembly xmlns="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/1.1.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/1.1.0 http://maven.apache.org/xsd/assembly-1.1.0.xsd">
+	<id>bin</id>
+	<formats>
+		<format>dir</format>
+	</formats>
+	<baseDirectory></baseDirectory>
+	<fileSets>
+		<fileSet>
+			<directory>${project.basedir}/src/main/resources</directory>
+			<outputDirectory>/modules/job/image-scaling/config</outputDirectory>
+			<includes>
+				<include>**/*.xml</include>
+				<include>application.properties</include>
+			</includes>
+		</fileSet>
+		<fileSet>
+			<directory>${project.basedir}/target</directory>
+			<outputDirectory>/modules/job/image-scaling/lib</outputDirectory>
+			<includes>
+				<include>original*.jar</include>
+			</includes>
+		</fileSet>
+	</fileSets>
+	<dependencySets>
+		<dependencySet>
+			<outputDirectory>/modules/job/image-scaling/lib</outputDirectory>
+			<useProjectArtifact>false</useProjectArtifact>
+			<scope>runtime</scope>
+			<includes>
+				<include>org.imgscalr:imgscalr-lib</include>
+			</includes>
+		</dependencySet>
+	</dependencySets>
+</assembly>

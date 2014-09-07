@@ -21,6 +21,7 @@
 	<modules>
 		<module>single-thread</module>
 		<module>multi-threaded</module>
+		<module>xd-multi-threaded</module>
 		<module>async-process</module>
 		<module>remote-chunking/remote-chunking-master</module>
 		<module>remote-chunking/remote-chunking-slave</module>

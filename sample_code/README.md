@@ -22,6 +22,8 @@ Running samples:
     
     * Extract the archive and move *.jpg into $HOME/image_submissions/unprocessed
 
+	$ unzip -j CAT_DATASET_02.zip  "*.jpg" -d "$HOME/image_submissions/unprocessed"
+
 Single thread sample
 
 * java -Djava.awt.headless=true -jar single-thread/target/single-thread-1.0.0.BUILD-SNAPSHOT.jar
