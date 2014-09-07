@@ -1,3 +1,4 @@
+
 Basic and self contained samples for scaling options in spring batch. At this time, these samples build with 3.1.0.BUILD-SNAPSHOT to utilize the remote chunking namespace support that will be available in the upcoming 3.1.0 release version. 
 
 The theme to each sample is a user submits images that our job needs to resize. The path to the file is stored in the database, the image on disk residing in the "unprocessed" directory. The job will read the paths from the database and resize the image, writing it to the "processed" directory.
